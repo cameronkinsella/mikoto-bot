@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+# Helper script to run cargo commands from a Docker environment.
+# <DEVICE> should be your development board's USB device.
+
+print_usage() {
+  printf "\n%s\nmikoto-cargo: Run a cargo command with a configured embedded development environment.\n%s\n"
+  printf "Usage: mikoto-cargo <DEVICE> <COMMAND> [ARG...]"
+}
+
+docker run -it --rm --device="$1" "$(docker build -q .)" "${@:2}" || print_usage;
