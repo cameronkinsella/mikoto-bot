@@ -56,6 +56,7 @@ fn main() -> ! {
         let state_change = SIGNAL.load(Ordering::SeqCst);
         if state_change {
             led.toggle();
+            defmt::info!("LED is now {}!", if led.is_on() { "on" } else { "off" });
             SIGNAL.store(false, Ordering::SeqCst);
         }
     }
