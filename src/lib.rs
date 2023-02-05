@@ -11,3 +11,8 @@ pub use button::Button;
 
 mod usart;
 pub use usart::Usart;
+
+mod servo;
+pub use servo::InputRange;
+pub use servo::Servo;
+pub use servo::ServoRanges;
