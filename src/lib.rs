@@ -17,7 +17,12 @@ pub use servo::InputRange;
 pub use servo::Servo;
 pub use servo::ServoRanges;
 
-mod hc_sr04;
-pub use hc_sr04::unit;
-pub use hc_sr04::Distance;
-pub use hc_sr04::Ultrasonic;
+mod ultrasonic;
+pub use ultrasonic::unit;
+pub use ultrasonic::Ultrasonic;
+
+pub mod hc_sr04;
+pub use hc_sr04::HcSr04;
+
+pub mod urm37;
+pub use urm37::Urm37;

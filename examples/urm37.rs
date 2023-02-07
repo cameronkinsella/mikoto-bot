@@ -6,7 +6,7 @@ use cortex_m_rt::entry;
 use defmt_rtt as _;
 use panic_probe as _;
 
-use mikoto_bot::{hal::prelude::*, hc_sr04::Distance, pac, HcSr04, Led, Ultrasonic};
+use mikoto_bot::{hal::prelude::*, pac, urm37::Distance, Led, Ultrasonic, Urm37};
 
 #[entry]
 fn main() -> ! {
@@ -27,7 +27,7 @@ fn main() -> ! {
     // Configure ultrasonic sensor
     let trig = gpioa.pa9;
     let echo = gpioa.pa8;
-    let mut ultrasonic = HcSr04::new(trig, echo, counter);
+    let mut ultrasonic = Urm37::new(trig, echo, counter);
 
     // Configure PA5 (LD2 - User LED) as an output
     let mut led = Led::new(gpioa.pa5);
