@@ -82,7 +82,15 @@ where
 
     /// Set the servo's position. Must give a position within the input range.
     pub fn set_position(&mut self, position: i32) -> Result<(), Error> {
-        if !(self.input_range.0..=self.input_range.1).contains(&position) {
+        let (low, high);
+        if self.input_range.0 < self.input_range.1 {
+            low = self.input_range.0;
+            high = self.input_range.1;
+        } else {
+            low = self.input_range.1;
+            high = self.input_range.0;
+        }
+        if !(low..=high).contains(&position) {
             return Err(Error::InvalidPosition);
         }
 
@@ -157,6 +165,12 @@ pub trait ServoRanges {
     const POSITIONAL_RANGE: InputRange = (0, 180);
     /// Range for continuous servos. Magnitude corresponds to speed and sign indicates direction.
     const CONTINUOUS_RANGE: InputRange = (-100, 100);
+
+    fn rev(self) -> Self;
 }
 
-impl ServoRanges for InputRange {}
+impl ServoRanges for InputRange {
+    fn rev(self) -> Self {
+        (self.1, self.0)
+    }
+}

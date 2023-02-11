@@ -54,6 +54,7 @@ fn main() -> ! {
         BUTTON.borrow(cs).replace(Some(button));
     });
 
+    // Optional: change the range of values we can use for inputs (default = 0-180)
     servo.set_input_range(InputRange::CONTINUOUS_RANGE);
 
     // Enable the external interrupt
