@@ -1,7 +1,0 @@
-/target/
-Cargo.lock
-**.orig
-**~
-**.bk
-**.sw*
-.idea/

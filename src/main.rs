@@ -5,7 +5,7 @@ use cortex_m_rt::entry;
 use defmt_rtt as _;
 use panic_probe as _;
 
-use lsmdso::{GyroscopeFullScale, GyroscopeOutput, Lsm6dso};
+use lsm6dso::{GyroscopeFullScale, GyroscopeOutput, Lsm6dso};
 use mikoto_bot::{
     hal::{i2c::I2c, prelude::*},
     pac,
