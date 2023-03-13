@@ -6,15 +6,24 @@ use panic_probe as _;
 
 #[rtic::app(device = mikoto_bot::pac, peripherals = true)]
 mod app {
-    use mikoto_bot::hc_sr04::Distance;
-    use mikoto_bot::unit::Cm;
+    use mikoto_bot::pac::{I2C2, TIM2};
     use mikoto_bot::{
-        hal::{gpio::Edge, prelude::*},
-        pac::{Peripherals, TIM2},
-        Button, Direction, Led, Mikoto, MikotoPeripherals, Usart,
+        hal::{
+            gpio::{Alternate, Edge, OpenDrain, Pin},
+            i2c::I2c,
+            prelude::*,
+            timer::DelayUs,
+        },
+        pac, Button, Direction, Led, Mikoto, MikotoPeripherals, MikotoWheels, Vl53l1x,
     };
-    use stm32f4xx_hal::gpio::PB3;
-    use stm32f4xx_hal::timer::DelayUs;
+
+    type I2c2 = I2c<
+        I2C2,
+        (
+            Pin<'B', 10, Alternate<4, OpenDrain>>,
+            Pin<'B', 3, Alternate<9, OpenDrain>>,
+        ),
+    >;
 
     #[shared]
     struct Resources {
@@ -26,12 +35,19 @@ mod app {
     struct Local {
         mikoto: Mikoto,
         delay: DelayUs<TIM2>,
+        i2c: I2c<
+            I2C2,
+            (
+                Pin<'B', 10, Alternate<4, OpenDrain>>,
+                Pin<'B', 3, Alternate<9, OpenDrain>>,
+            ),
+        >,
     }
 
     #[init]
     fn init(ctx: init::Context) -> (Resources, Local, init::Monotonics) {
         // Device specific peripherals
-        let mut dp: Peripherals = ctx.device;
+        let mut dp: pac::Peripherals = ctx.device;
 
         // Setup the system clock
         let rcc = dp.RCC.constrain();
@@ -39,7 +55,7 @@ mod app {
 
         let mut syscfg = dp.SYSCFG.constrain();
 
-        let delay = dp.TIM2.delay_us(&clocks);
+        let mut delay = dp.TIM2.delay_us(&clocks);
 
         let gpioa = dp.GPIOA.split();
         let gpiob = dp.GPIOB.split();
@@ -52,22 +68,33 @@ mod app {
         // Setup the led
         let led = Led::new(gpioa.pa5);
 
-        let mikoto_dp = MikotoPeripherals {
+        // Get the SCL and SDA pins of the I2C bus
+        let sda = gpiob.pb3.into_alternate_open_drain();
+        let scl = gpiob.pb10.into_alternate_open_drain();
+
+        let mut i2c = I2c::new(dp.I2C2, (scl, sda), 400.kHz(), &clocks);
+
+        let mikoto_tof = Vl53l1x::new(&mut i2c, &mut delay);
+
+        let mikoto_wheels = MikotoWheels {
             pb8: gpiob.pb8,
             pa11: gpioa.pa11,
             pc6: gpioc.pc6,
-            pa9: gpioa.pa9,
-            pa8: gpioa.pa8,
             tim1: dp.TIM1,
             tim3: dp.TIM3,
             tim4: dp.TIM4,
             tim5: dp.TIM5,
         };
 
+        let mikoto_dp = MikotoPeripherals {
+            tof: mikoto_tof,
+            wheels: mikoto_wheels,
+        };
+
         let mikoto = Mikoto::new(mikoto_dp, &clocks);
         (
             Resources { led, button },
-            Local { mikoto, delay },
+            Local { mikoto, delay, i2c },
             init::Monotonics(),
         )
     }
@@ -78,12 +105,13 @@ mod app {
         loop {}
     }
 
-    #[task(binds = EXTI15_10, shared = [led, button], local = [delay, mikoto])]
+    #[task(binds = EXTI15_10, shared = [led, button], local = [delay, mikoto, i2c])]
     fn on_button_press(ctx: on_button_press::Context) {
         let mut led = ctx.shared.led;
         let mut button = ctx.shared.button;
         let delay: &mut DelayUs<TIM2> = ctx.local.delay;
         let mikoto: &mut Mikoto = ctx.local.mikoto;
+        let i2c: &mut I2c2 = ctx.local.i2c;
 
         // Clear the interrupt
         button.lock(|b: &mut Button| b.clear_interrupt_pending_bit());
@@ -94,25 +122,13 @@ mod app {
         mikoto.drive(Direction::Forward, 100).unwrap();
 
         loop {
-            let current_distance = mikoto.ultrasonic.read().unwrap().as_cm();
-            if current_distance <= Distance::new(20_u32) {
-                break;
-            }
-            delay.delay_ms(100_u32);
-        }
-        mikoto.drive(Direction::Backward, 100).unwrap();
-        loop {
-            let current_distance = mikoto.ultrasonic.read().unwrap().as_cm();
-            if current_distance >= Distance::new(50_u32) {
+            let current_distance = mikoto.tof.read(i2c, delay);
+            if current_distance <= 1500 {
                 break;
             }
             delay.delay_ms(100_u32);
         }
 
-        mikoto.drive(Direction::Right, 100).unwrap();
-        delay.delay_ms(5000_u32);
-        mikoto.drive(Direction::Left, 100).unwrap();
-        delay.delay_ms(5000_u32);
         mikoto.stop().unwrap();
     }
 }
