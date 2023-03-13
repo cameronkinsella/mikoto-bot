@@ -21,6 +21,9 @@ mod ultrasonic;
 pub use ultrasonic::unit;
 pub use ultrasonic::Ultrasonic;
 
+mod vl53l1x;
+pub use vl53l1x::Vl53l1x;
+
 pub mod hc_sr04;
 pub use hc_sr04::HcSr04;
 
