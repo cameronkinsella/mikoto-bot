@@ -70,7 +70,7 @@ where
             }
         });
         match channel {
-            None => return Err(Error::PwmDisabled),
+            None => Err(Error::PwmDisabled),
             Some(c) => Ok(c),
         }
     }

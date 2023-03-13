@@ -108,10 +108,6 @@ impl<U> PartialEq<Self> for Distance<U> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
-
-    fn ne(&self, other: &Self) -> bool {
-        self.0 != other.0
-    }
 }
 
 impl<U> PartialOrd<Self> for Distance<U> {
