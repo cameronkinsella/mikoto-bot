@@ -82,6 +82,11 @@ where
 
     /// Set the servo's position. Must give a position within the input range.
     pub fn set_position(&mut self, position: i32) -> Result<(), Error> {
+        if position == self.position() {
+            // No change
+            return Ok(());
+        }
+
         let (low, high);
         if self.input_range.0 < self.input_range.1 {
             low = self.input_range.0;
@@ -95,7 +100,6 @@ where
         }
 
         let duty_limit = self.pwm.get_max_duty() as f64;
-
         self.pwm.set_duty(
             self.channel,
             libm::round(duty_limit * self.position_as_duty(position)) as u16,

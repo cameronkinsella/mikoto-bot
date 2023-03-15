@@ -3,7 +3,7 @@ use crate::hal::{
     prelude::*,
     timer::{CounterUs, Instance},
 };
-use crate::{unit::*, Ultrasonic};
+use crate::{distance_unit::*, Ultrasonic};
 use core::{cmp::Ordering, fmt, marker::PhantomData};
 
 /// URM37 v5.0 Ultrasonic sensor

@@ -62,14 +62,11 @@ impl Vl53l1x {
         D: DelayUs<u32> + DelayMs<u32>,
     {
         loop {
-            defmt::debug!("Wait measurement data ready...");
             if vl53l1::wait_measurement_data_ready(&mut self.device, i2c, delay).is_err() {
-                delay.delay_ms(100u32);
+                delay.delay_ms(1u32);
                 continue;
             }
-            defmt::debug!("  Ready");
 
-            defmt::debug!("Get ranging measurement data...");
             match vl53l1::get_ranging_measurement_data(&mut self.device, i2c) {
                 Err(_e) => {
                     defmt::warn!("  Error getting ranging measurement data");

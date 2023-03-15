@@ -3,7 +3,7 @@ use crate::hal::{
     prelude::*,
     timer::{CounterUs, Instance},
 };
-use crate::{unit::*, Ultrasonic};
+use crate::{distance_unit::*, Ultrasonic};
 use core::{cmp::Ordering, fmt, marker::PhantomData};
 
 /// HC-SR04 Ultrasonic sensor

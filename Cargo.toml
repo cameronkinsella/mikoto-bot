@@ -31,6 +31,7 @@ libm = "0.2.6"
 lsm6dso = "0.1"
 mpu6050-dmp = "0.3.0"
 vl53l1 = "0.1.2"
+lazy_static = {version="1.4.0", features = ["spin_no_std"]}
 
 [dev-dependencies]
 dwt-systick-monotonic = "1.0.0"
