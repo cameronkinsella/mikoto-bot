@@ -63,28 +63,64 @@ pub struct Mikoto {
     right_wheel: Servo<TIM5, Pin<'A', 1, Alternate<2>>, Ch<1>>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Copy, Clone)]
+pub enum VeerOptions {
+    Forward = 1,
+    Backward = -1,
+}
+
+impl TryFrom<Direction> for VeerOptions {
+    type Error = servo::Error;
+
+    fn try_from(value: Direction) -> Result<Self, Self::Error> {
+        match value {
+            Direction::Forward => Ok(VeerOptions::Forward),
+            Direction::Backward => Ok(VeerOptions::Backward),
+            _ => Err(servo::Error::InvalidPosition),
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
 pub enum Direction {
     Forward,
     Backward,
     Left,
     Right,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum VeerDirection {
-    Left,
-    Right,
+    VeerRight {
+        direction: VeerOptions,
+        percentage: u32,
+    },
+    VeerLeft {
+        direction: VeerOptions,
+        percentage: u32,
+    },
 }
 
 impl Direction {
     fn motor_direction(&self, speed: u32) -> (i32, i32, i32) {
         let speed = speed as i32;
-        match *self {
+        match &*self {
             Self::Forward => (speed, speed, speed),
             Self::Backward => (-speed, -speed, -speed),
             Self::Left => (0, -speed, speed),
             Self::Right => (0, speed, -speed),
+            Self::VeerRight {
+                direction,
+                percentage,
+            } => (
+                *direction as i32 * speed,
+                *direction as i32 * speed,
+                *direction as i32 * speed * (100 - *percentage as i32) / 100,
+            ),
+            Self::VeerLeft {
+                direction,
+                percentage,
+            } => (
+                *direction as i32 * speed,
+                *direction as i32 * speed * (100 - *percentage as i32) / 100,
+                *direction as i32 * speed,
+            ),
         }
     }
 }
@@ -137,26 +173,6 @@ impl Mikoto {
         Ok(())
     }
 
-    pub fn veer(&mut self, direction: VeerDirection, percentage: f32) -> Result<(), servo::Error> {
-        if !(0.0..=100.0).contains(&percentage) {
-            return Err(servo::Error::InvalidPosition);
-        }
-
-        let speed = libm::fmaxf(
-            self.left_wheel.position() as f32,
-            self.right_wheel.position() as f32,
-        );
-
-        let (new_left, new_right) = match direction {
-            VeerDirection::Left => (((100.0 - percentage) / 100.0) * speed, speed),
-            VeerDirection::Right => (speed, ((100.0 - percentage) / 100.0) * speed),
-        };
-
-        self.left_wheel.set_position(new_left as i32)?;
-        self.right_wheel.set_position(new_right as i32)?;
-        Ok(())
-    }
-
     pub fn drive_straight(
         &mut self,
         current_yaw: Angle<angle_unit::Radians>,
@@ -164,29 +180,24 @@ impl Mikoto {
         direction: Direction,
         speed: u32,
     ) -> Result<(), servo::Error> {
-        // Check that direction is front or back and set speed if not already set
-        if let Direction::Forward = direction {
-            if self.left_wheel.position() != speed as i32
-                && self.right_wheel.position() != speed as i32
-            {
-                self.drive(direction, speed)?;
-            }
-        } else if let Direction::Backward = direction {
-            if self.left_wheel.position() != -(speed as i32)
-                && self.right_wheel.position() != -(speed as i32)
-            {
-                self.drive(direction, speed)?;
-            }
-        } else {
-            return Err(servo::Error::InvalidPosition);
-        }
-
         if current_yaw.value() - desired_angle.value() >= 2_f32.to_radians() {
             // offset right
-            self.veer(VeerDirection::Left, 80.0)?;
+            self.drive(
+                Direction::VeerLeft {
+                    direction: VeerOptions::try_from(direction)?,
+                    percentage: 80,
+                },
+                speed,
+            )?;
         } else if current_yaw.value() - desired_angle.value() <= -2_f32.to_radians() {
             // offset left
-            self.veer(VeerDirection::Right, 80.0)?;
+            self.drive(
+                Direction::VeerRight {
+                    direction: VeerOptions::try_from(direction)?,
+                    percentage: 80,
+                },
+                speed,
+            )?;
         } else if libm::fabsf(current_yaw.value() - desired_angle.value()) <= 1_f32.to_radians() {
             // offset fixed
             self.drive(direction, speed)?;
