@@ -36,12 +36,14 @@ pub use hc_sr04::HcSr04;
 pub mod urm37;
 pub use urm37::Urm37;
 
+use core::f32::consts;
 use hal::{
     gpio::{Alternate, Pin},
     rcc::Clocks,
     timer::Ch,
 };
 use pac::{TIM1, TIM3, TIM5};
+use pid::Pid;
 use stm32f4xx_hal::gpio::{PA1, PA11, PC6};
 
 pub struct MikotoWheels {
@@ -61,6 +63,7 @@ pub struct Mikoto {
     front_wheel: Servo<TIM3, Pin<'C', 6, Alternate<2>>, Ch<0>>,
     left_wheel: Servo<TIM1, Pin<'A', 11, Alternate<1>>, Ch<3>>,
     right_wheel: Servo<TIM5, Pin<'A', 1, Alternate<2>>, Ch<1>>,
+    pid: Pid<f32>,
 }
 
 #[derive(Copy, Clone)]
@@ -157,10 +160,16 @@ impl Mikoto {
         left_wheel.set_input_range(InputRange::CONTINUOUS_RANGE);
         right_wheel.set_input_range(InputRange::CONTINUOUS_RANGE.rev());
 
+        let mut pid = Pid::new(0.0, 25.0);
+        pid.p(6.0 * (180.0 / consts::PI), 25.0);
+        pid.i(4.0 * (180.0 / consts::PI), 25.0);
+        //pid.d(0.5 * (180.0 / PI), 25.0);
+
         Self {
             front_wheel,
             left_wheel,
             right_wheel,
+            pid,
         }
     }
 
@@ -190,25 +199,30 @@ impl Mikoto {
         direction: Direction,
         speed: u32,
     ) -> Result<(), servo::Error> {
-        if current_yaw.value() - desired_angle.value() > 0.5_f32.to_radians() {
+        let output = self
+            .pid
+            .next_control_output(current_yaw.value() - desired_angle.value())
+            .output;
+        defmt::info!("Output: {}", output);
+        if output < -0.5f32 {
             // offset right
             self.drive(
                 Direction::VeerLeft {
                     direction: VeerOptions::try_from(direction)?,
-                    percentage: 70,
+                    percentage: 65 + (-1.0 * output) as u32,
                 },
                 speed,
             )?;
-        } else if current_yaw.value() - desired_angle.value() < -0.5_f32.to_radians() {
+        } else if output > 0.5f32 {
             // offset left
             self.drive(
                 Direction::VeerRight {
                     direction: VeerOptions::try_from(direction)?,
-                    percentage: 85,
+                    percentage: 75 + (output) as u32,
                 },
                 speed,
             )?;
-        } else if libm::fabsf(current_yaw.value() - desired_angle.value()) <= 0.5_f32.to_radians() {
+        } else {
             // offset fixed
             self.drive(direction, speed)?;
         }
