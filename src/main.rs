@@ -151,7 +151,7 @@ mod app {
         let delay: &mut DelayUs<TIM4> = ctx.local.delay;
 
         // Distance (in mm) from the wall in which we ignore any anomalies detected
-        const BUFFER: f32 = 200.0;
+        const BUFFER: f32 = 250.0;
 
         let mut c_started = false;
 
@@ -206,7 +206,7 @@ mod app {
                     }
                 }
                 Task::ClimbUp => {
-                    mikoto.drive(Direction::Forward, 100).unwrap();
+                    mikoto.drive(Direction::Forward, 25).unwrap();
                     if gyro_reading.pitch.to_degrees() <= Angle::new(45.0) {
                         defmt::info!("Reached peak of wall...");
                         *t = Task::ClimbOver;
@@ -226,7 +226,7 @@ mod app {
                     mikoto.drive(Direction::Forward, 100).unwrap();
                     #[allow(clippy::collapsible_if)]
                     if gyro_reading.pitch.to_degrees() >= Angle::new(-5.0) {
-                        if wait_until(counter, &mut c_started, 1_000_000) {
+                        if wait_until(counter, &mut c_started, 800_000) {
                             defmt::info!("Dismounted wall...");
                             *t = Task::FindPole;
                         }
@@ -240,7 +240,7 @@ mod app {
                         let angle = gyro_reading.yaw;
                         let distance = tof.read(i2c, delay);
                         let expected = expected_dist(&angle);
-                        mikoto.drive(Direction::Left, 5).unwrap();
+                        mikoto.drive(Direction::Left, 4).unwrap();
 
                         if angle.to_degrees() <= Angle::new(-60.0) {
                             defmt::info!("Scanning right...");
@@ -257,7 +257,7 @@ mod app {
                         let angle = gyro_reading.yaw;
                         let distance = tof.read(i2c, delay);
                         let expected = expected_dist(&angle);
-                        mikoto.drive(Direction::Right, 5).unwrap();
+                        mikoto.drive(Direction::Right, 4).unwrap();
 
                         if angle.to_degrees() >= Angle::new(60.0) {
                             defmt::info!("Scanning left...");

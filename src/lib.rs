@@ -165,6 +165,16 @@ impl Mikoto {
     }
 
     pub fn drive(&mut self, direction: Direction, speed: u32) -> Result<(), servo::Error> {
+        if let Direction::VeerRight { percentage, .. } = direction {
+            if !(0..=100).contains(&percentage) {
+                return Err(servo::Error::InvalidPosition);
+            }
+        } else if let Direction::VeerLeft { percentage, .. } = direction {
+            if !(0..=100).contains(&percentage) {
+                return Err(servo::Error::InvalidPosition);
+            }
+        }
+
         let (front_speed, left_speed, right_speed) = direction.motor_direction(speed);
 
         self.front_wheel.set_position(front_speed)?;
@@ -180,25 +190,25 @@ impl Mikoto {
         direction: Direction,
         speed: u32,
     ) -> Result<(), servo::Error> {
-        if current_yaw.value() - desired_angle.value() >= 2_f32.to_radians() {
+        if current_yaw.value() - desired_angle.value() > 0.5_f32.to_radians() {
             // offset right
             self.drive(
                 Direction::VeerLeft {
                     direction: VeerOptions::try_from(direction)?,
-                    percentage: 80,
+                    percentage: 70,
                 },
                 speed,
             )?;
-        } else if current_yaw.value() - desired_angle.value() <= -2_f32.to_radians() {
+        } else if current_yaw.value() - desired_angle.value() < -0.5_f32.to_radians() {
             // offset left
             self.drive(
                 Direction::VeerRight {
                     direction: VeerOptions::try_from(direction)?,
-                    percentage: 80,
+                    percentage: 85,
                 },
                 speed,
             )?;
-        } else if libm::fabsf(current_yaw.value() - desired_angle.value()) <= 1_f32.to_radians() {
+        } else if libm::fabsf(current_yaw.value() - desired_angle.value()) <= 0.5_f32.to_radians() {
             // offset fixed
             self.drive(direction, speed)?;
         }
