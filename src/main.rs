@@ -157,6 +157,9 @@ mod app {
 
         let mut offset_angle: Angle<Degrees> = Angle::new(0.0);
 
+        let mut on_pole_base = false;
+        let mut pole_zero_pitch = Angle::new(0.0);
+
         enum Scan {
             Stop,
             Left,
@@ -170,12 +173,12 @@ mod app {
             let mut gyro_reading = gyro.read();
             // Gyro is mounted upside down, so directions are reversed.
             gyro_reading = YawPitchRoll::from(YPR {
-                yaw: gyro_reading.yaw.value() * -1.0,
-                pitch: gyro_reading.pitch.value() * -1.0,
-                roll: gyro_reading.roll.value() * -1.0,
+                yaw: gyro_reading.yaw.value(),
+                pitch: gyro_reading.pitch.value(),
+                roll: gyro_reading.roll.value(),
             });
             defmt::debug!(
-                "yaw: {}°, pitch: {}°, roll: {}°",
+                "yaw: {}, pitch: {}, roll: {}",
                 gyro_reading.yaw.to_degrees(),
                 gyro_reading.pitch.to_degrees(),
                 gyro_reading.roll.to_degrees()
@@ -186,7 +189,7 @@ mod app {
                     mikoto.stop().unwrap();
                 }
                 Task::ApproachWall => {
-                    if gyro_reading.pitch.to_degrees() >= Angle::new(85.0) {
+                    if gyro_reading.pitch.to_degrees() >= Angle::new(75.0) {
                         defmt::info!("Mounted wall...");
                         *t = Task::ClimbUp;
                     }
@@ -206,17 +209,26 @@ mod app {
                     }
                 }
                 Task::ClimbUp => {
-                    mikoto.drive(Direction::Forward, 25).unwrap();
+                    mikoto.drive(Direction::Forward, 15).unwrap();
+
+                    #[allow(clippy::collapsible_if)]
                     if gyro_reading.pitch.to_degrees() <= Angle::new(45.0) {
-                        defmt::info!("Reached peak of wall...");
-                        *t = Task::ClimbOver;
+                        if wait_until(counter, &mut c_started, 500_000) {
+                            defmt::info!("Reached peak of wall...");
+                            *t = Task::ClimbOver;
+                        }
                     }
                 }
                 Task::ClimbOver => {
-                    mikoto.drive(Direction::Forward, 5).unwrap();
+                    if gyro_reading.pitch.to_degrees() <= Angle::new(-45.0) {
+                        mikoto.drive(Direction::Forward, 2).unwrap();
+                    } else {
+                        mikoto.drive(Direction::Forward, 100).unwrap();
+                    }
+
                     #[allow(clippy::collapsible_if)]
-                    if gyro_reading.pitch.to_degrees() <= Angle::new(-85.0) {
-                        if wait_until(counter, &mut c_started, 1_000_000) {
+                    if gyro_reading.pitch.to_degrees() <= Angle::new(-75.0) {
+                        if wait_until(counter, &mut c_started, 1_500_000) {
                             defmt::info!("Climbed over peak of wall...");
                             *t = Task::ClimbDown;
                         }
@@ -224,6 +236,7 @@ mod app {
                 }
                 Task::ClimbDown => {
                     mikoto.drive(Direction::Forward, 100).unwrap();
+
                     #[allow(clippy::collapsible_if)]
                     if gyro_reading.pitch.to_degrees() >= Angle::new(-5.0) {
                         if wait_until(counter, &mut c_started, 800_000) {
@@ -240,13 +253,14 @@ mod app {
                         let angle = gyro_reading.yaw;
                         let distance = tof.read(i2c, delay);
                         let expected = expected_dist(&angle);
-                        mikoto.drive(Direction::Left, 4).unwrap();
+                        mikoto.drive(Direction::Left, 5).unwrap();
 
                         if angle.to_degrees() <= Angle::new(-60.0) {
                             defmt::info!("Scanning right...");
                             scan = Scan::Right;
                         } else if distance as f32 <= expected - BUFFER {
                             offset_angle = angle.to_degrees();
+                            pole_zero_pitch = gyro_reading.pitch.to_degrees();
                             defmt::info!("Pole detected!");
                             defmt::info!("Distance: {} mm, Angle: {}", distance, offset_angle);
                             scan = Scan::Stop;
@@ -257,13 +271,14 @@ mod app {
                         let angle = gyro_reading.yaw;
                         let distance = tof.read(i2c, delay);
                         let expected = expected_dist(&angle);
-                        mikoto.drive(Direction::Right, 4).unwrap();
+                        mikoto.drive(Direction::Right, 5).unwrap();
 
                         if angle.to_degrees() >= Angle::new(60.0) {
                             defmt::info!("Scanning left...");
                             scan = Scan::Left;
                         } else if distance as f32 <= expected - BUFFER {
                             offset_angle = angle.to_degrees();
+                            pole_zero_pitch = gyro_reading.pitch.to_degrees();
                             defmt::info!("Pole detected!");
                             defmt::info!("Distance: {} mm, Angle: {}", distance, offset_angle);
                             scan = Scan::Stop;
@@ -273,11 +288,20 @@ mod app {
                 },
                 Task::ApproachPole => {
                     let distance = tof.read(i2c, delay);
-                    // Stop when 15 cm away from pole
-                    if distance <= 150 {
-                        offset_angle = Angle::new(0.0);
-                        defmt::info!("Pole found! Mission complete.");
-                        *t = Task::WaitForButton;
+                    let found_pole = distance < 150;
+
+                    if gyro_reading.pitch.to_degrees() > Angle::new(pole_zero_pitch.value() + 2.0) {
+                        on_pole_base = true
+                    }
+
+                    // Stop when 15 cm away from pole or when front wheel is on pole base
+                    #[allow(clippy::collapsible_if)]
+                    if found_pole || on_pole_base {
+                        if found_pole || wait_until(counter, &mut c_started, 250_000) {
+                            offset_angle = Angle::new(0.0);
+                            defmt::info!("Pole found! Mission complete.");
+                            *t = Task::WaitForButton;
+                        }
                     }
 
                     mikoto

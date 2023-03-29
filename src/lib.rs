@@ -103,7 +103,7 @@ pub enum Direction {
 impl Direction {
     fn motor_direction(&self, speed: u32) -> (i32, i32, i32) {
         let speed = speed as i32;
-        match &*self {
+        match self {
             Self::Forward => (speed, speed, speed),
             Self::Backward => (-speed, -speed, -speed),
             Self::Left => (0, -speed, speed),
@@ -130,10 +130,9 @@ impl Direction {
 
 impl Mikoto {
     pub fn new(dp: MikotoPeripherals, clocks: &Clocks) -> Self {
-        // Front wheel has 75% speed
         let mut front_wheel = Servo::new(
-            750.0,
-            2250.0,
+            500.0,
+            2500.0,
             dp.wheels.pc6.into_alternate(),
             dp.wheels.tim3,
             clocks,
@@ -204,7 +203,6 @@ impl Mikoto {
             .pid
             .next_control_output(current_yaw.value() - desired_angle.value())
             .output;
-        defmt::info!("Output: {}", output);
         if output < -0.5f32 {
             // offset right
             self.drive(
