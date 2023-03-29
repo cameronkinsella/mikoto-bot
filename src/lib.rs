@@ -161,9 +161,10 @@ impl Mikoto {
         right_wheel.set_input_range(InputRange::CONTINUOUS_RANGE.rev());
 
         let mut pid = Pid::new(0.0, 25.0);
-        pid.p(6.0 * (180.0 / consts::PI), 25.0);
-        pid.i(4.0 * (180.0 / consts::PI), 25.0);
-        //pid.d(0.5 * (180.0 / PI), 25.0);
+        pid.p(10.0 * (180.0 / consts::PI), 25.0);
+        // pid.p(4.0 * (180.0 / consts::PI), 25.0);
+        // pid.i(10.0 * (180.0 / consts::PI), 25.0);
+        // pid.d(150.0 * (180.0 / consts::PI), 25.0);
 
         Self {
             front_wheel,
