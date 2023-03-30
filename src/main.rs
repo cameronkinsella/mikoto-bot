@@ -189,7 +189,7 @@ mod app {
                     mikoto.stop().unwrap();
                 }
                 Task::ApproachWall => {
-                    if gyro_reading.pitch.to_degrees() >= Angle::new(75.0) {
+                    if gyro_reading.pitch.to_degrees() >= Angle::new(60.0) {
                         defmt::info!("Mounted wall...");
                         *t = Task::ClimbUp;
                     }
@@ -209,7 +209,7 @@ mod app {
                     }
                 }
                 Task::ClimbUp => {
-                    mikoto.drive(Direction::Forward, 15).unwrap();
+                    mikoto.drive(Direction::Forward, 100).unwrap();
 
                     #[allow(clippy::collapsible_if)]
                     if gyro_reading.pitch.to_degrees() <= Angle::new(45.0) {
@@ -221,7 +221,7 @@ mod app {
                 }
                 Task::ClimbOver => {
                     if gyro_reading.pitch.to_degrees() <= Angle::new(-45.0) {
-                        mikoto.drive(Direction::Forward, 2).unwrap();
+                        mikoto.drive(Direction::Forward, 15).unwrap();
                     } else {
                         mikoto.drive(Direction::Forward, 100).unwrap();
                     }
@@ -238,7 +238,7 @@ mod app {
                     mikoto.drive(Direction::Forward, 100).unwrap();
 
                     #[allow(clippy::collapsible_if)]
-                    if gyro_reading.pitch.to_degrees() >= Angle::new(-5.0) {
+                    if gyro_reading.pitch.to_degrees() >= Angle::new(-10.0) {
                         if wait_until(counter, &mut c_started, 800_000) {
                             defmt::info!("Dismounted wall...");
                             *t = Task::FindPole;
@@ -255,7 +255,7 @@ mod app {
                         let expected = expected_dist(&angle);
                         mikoto.drive(Direction::Left, 5).unwrap();
 
-                        if angle.to_degrees() <= Angle::new(-60.0) {
+                        if angle.to_degrees() <= Angle::new(-80.0) {
                             defmt::info!("Scanning right...");
                             scan = Scan::Right;
                         } else if distance as f32 <= expected - BUFFER {
@@ -273,7 +273,7 @@ mod app {
                         let expected = expected_dist(&angle);
                         mikoto.drive(Direction::Right, 5).unwrap();
 
-                        if angle.to_degrees() >= Angle::new(60.0) {
+                        if angle.to_degrees() >= Angle::new(80.0) {
                             defmt::info!("Scanning left...");
                             scan = Scan::Left;
                         } else if distance as f32 <= expected - BUFFER {
