@@ -46,7 +46,7 @@ where
         let ts1 = counter.now().ticks();
         // Hold still and read values for 20 seconds to zero yaw-pitch-roll measurements
         while (counter.now().ticks() - ts1) < wait_time {
-            defmt::info!("{}", (counter.now().ticks() - ts1) / (1000 * 1000));
+            defmt::info!("{}", 20 - (counter.now().ticks() - ts1) / (1000 * 1000));
             self.read();
         }
         let offset = self.read();
