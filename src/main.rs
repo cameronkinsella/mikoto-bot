@@ -157,8 +157,12 @@ mod app {
 
         let mut offset_angle: Angle<Degrees> = Angle::new(0.0);
 
-        let mut on_pole_base = false;
+        let mut on_pole_base = (false, false); // (pitch, roll)
+        let mut stop_pole_base = false;
         let mut pole_zero_pitch = Angle::new(0.0);
+        let mut pole_zero_roll = Angle::new(0.0);
+
+        let mut scan_pause = false;
 
         enum Scan {
             Stop,
@@ -247,7 +251,20 @@ mod app {
                 }
                 Task::FindPole => match scan {
                     Scan::Stop => {
-                        scan = Scan::Left;
+                        mikoto.stop().unwrap();
+
+                        if scan_pause {
+                            if wait_until(counter, &mut c_started, 500_000) {
+                                offset_angle = gyro_reading.yaw.to_degrees();
+                                pole_zero_pitch = gyro_reading.pitch.to_degrees();
+                                pole_zero_roll = gyro_reading.roll.to_degrees();
+                                scan_pause = false;
+                                defmt::info!("Angle: {}", offset_angle);
+                                *t = Task::ApproachPole;
+                            }
+                        } else {
+                            scan = Scan::Left;
+                        }
                     }
                     Scan::Left => {
                         let angle = gyro_reading.yaw;
@@ -259,12 +276,10 @@ mod app {
                             defmt::info!("Scanning right...");
                             scan = Scan::Right;
                         } else if distance as f32 <= expected - BUFFER {
-                            offset_angle = angle.to_degrees();
-                            pole_zero_pitch = gyro_reading.pitch.to_degrees();
                             defmt::info!("Pole detected!");
-                            defmt::info!("Distance: {} mm, Angle: {}", distance, offset_angle);
+                            defmt::info!("Distance: {} mm", distance);
                             scan = Scan::Stop;
-                            *t = Task::ApproachPole;
+                            scan_pause = true;
                         }
                     }
                     Scan::Right => {
@@ -277,41 +292,55 @@ mod app {
                             defmt::info!("Scanning left...");
                             scan = Scan::Left;
                         } else if distance as f32 <= expected - BUFFER {
-                            offset_angle = angle.to_degrees();
-                            pole_zero_pitch = gyro_reading.pitch.to_degrees();
                             defmt::info!("Pole detected!");
-                            defmt::info!("Distance: {} mm, Angle: {}", distance, offset_angle);
+                            defmt::info!("Distance: {} mm", distance);
                             scan = Scan::Stop;
-                            *t = Task::ApproachPole;
+                            scan_pause = true;
                         }
                     }
                 },
                 Task::ApproachPole => {
                     let distance = tof.read(i2c, delay);
+                    // Stop when 15 cm away from pole or when front wheel is on pole base
                     let found_pole = distance < 150;
 
-                    if gyro_reading.pitch.to_degrees() > Angle::new(pole_zero_pitch.value() + 2.0) {
-                        on_pole_base = true
-                    }
+                    on_pole_base = (
+                        gyro_reading.pitch.to_degrees() > Angle::new(pole_zero_pitch.value() + 2.0), // pitch
+                        libm::fabsf(
+                            gyro_reading.roll.to_degrees().value() - pole_zero_roll.value(),
+                        ) >= 3.0, // roll
+                    );
 
-                    // Stop when 15 cm away from pole or when front wheel is on pole base
                     #[allow(clippy::collapsible_if)]
-                    if found_pole || on_pole_base {
-                        if found_pole || wait_until(counter, &mut c_started, 250_000) {
-                            offset_angle = Angle::new(0.0);
-                            defmt::info!("Pole found! Mission complete.");
-                            *t = Task::WaitForButton;
+                    if on_pole_base.0 || on_pole_base.1 {
+                        if on_pole_base.1 || wait_until(counter, &mut c_started, 250_000) {
+                            stop_pole_base = true;
                         }
+                    } else if !on_pole_base.0 && c_started {
+                        counter.cancel().unwrap();
+                        c_started = false;
                     }
 
-                    mikoto
-                        .drive_straight(
-                            gyro_reading.yaw,
-                            offset_angle.to_radians(),
-                            Direction::Forward,
-                            100,
-                        )
-                        .unwrap();
+                    if found_pole || stop_pole_base {
+                        mikoto.stop().unwrap();
+                        if found_pole || wait_until(counter, &mut c_started, 250_000) {
+                            if found_pole || on_pole_base.0 || on_pole_base.1 {
+                                offset_angle = Angle::new(0.0);
+                                defmt::info!("Pole found! Mission complete.");
+                                *t = Task::WaitForButton;
+                            }
+                            stop_pole_base = false
+                        }
+                    } else {
+                        mikoto
+                            .drive_straight(
+                                gyro_reading.yaw,
+                                offset_angle.to_radians(),
+                                Direction::Forward,
+                                100,
+                            )
+                            .unwrap();
+                    }
                 }
             });
         }
