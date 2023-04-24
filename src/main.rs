@@ -153,6 +153,9 @@ mod app {
         // Distance (in mm) from the wall in which we ignore any anomalies detected
         const BUFFER: f32 = 250.0;
 
+        // Angle left and right the robot should scan for anomalies (max 90 deg)
+        const SCAN_ANGLE: Angle<Degrees> = Angle::new(80.0);
+
         let mut c_started = false;
 
         let mut offset_angle: Angle<Degrees> = Angle::new(0.0);
@@ -272,7 +275,7 @@ mod app {
                         let expected = expected_dist(&angle);
                         mikoto.drive(Direction::Left, 5).unwrap();
 
-                        if angle.to_degrees() <= Angle::new(-80.0) {
+                        if angle.to_degrees() <= -SCAN_ANGLE {
                             defmt::info!("Scanning right...");
                             scan = Scan::Right;
                         } else if distance as f32 <= expected - BUFFER {
@@ -288,7 +291,7 @@ mod app {
                         let expected = expected_dist(&angle);
                         mikoto.drive(Direction::Right, 5).unwrap();
 
-                        if angle.to_degrees() >= Angle::new(80.0) {
+                        if angle.to_degrees() >= SCAN_ANGLE {
                             defmt::info!("Scanning left...");
                             scan = Scan::Left;
                         } else if distance as f32 <= expected - BUFFER {

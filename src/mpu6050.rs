@@ -1,7 +1,7 @@
 use crate::angle_unit::*;
 use crate::hal::prelude::*;
 use core::f32::consts;
-use core::{cmp::Ordering, fmt, marker::PhantomData};
+use core::{cmp::Ordering, fmt, marker::PhantomData, ops::Neg};
 use embedded_hal::blocking::delay::{DelayMs, DelayUs};
 use embedded_hal::blocking::i2c::{Write, WriteRead};
 use mpu6050_dmp::address::Address;
@@ -123,7 +123,7 @@ impl<U> Angle<U> {
     pub fn value(&self) -> f32 {
         self.0
     }
-    pub fn new(value: f32) -> Angle<U> {
+    pub const fn new(value: f32) -> Angle<U> {
         Angle(value, PhantomData)
     }
 }
@@ -149,6 +149,14 @@ impl<U: ValidUnit> fmt::Display for Angle<U> {
 impl<U: ValidUnit> defmt::Format for Angle<U> {
     fn format(&self, f: defmt::Formatter) {
         defmt::write!(f, "{}{}", self.0, U::UNIT);
+    }
+}
+
+impl<U: ValidUnit> Neg for Angle<U> {
+    type Output = Angle<U>;
+
+    fn neg(self) -> Self::Output {
+        Angle::new(-self.value())
     }
 }
 
