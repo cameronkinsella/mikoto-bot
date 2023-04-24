@@ -301,9 +301,9 @@ mod app {
                 },
                 Task::ApproachPole => {
                     let distance = tof.read(i2c, delay);
-                    // Stop when 15 cm away from pole or when front wheel is on pole base
                     let found_pole = distance < 150;
 
+                    // front wheel, left/right wheel
                     on_pole_base = (
                         gyro_reading.pitch.to_degrees() > Angle::new(pole_zero_pitch.value() + 2.0), // pitch
                         libm::fabsf(
@@ -311,27 +311,45 @@ mod app {
                         ) >= 3.0, // roll
                     );
 
+                    /*
+                    Stop conditions:
+                    0) Detect pole < 15cm away
+                    1) Front wheel on pole base (pitch change +2 deg) for 250ms
+                        THEN stays on pole base after stopping for 250ms
+                    2) Left or right wheel on pole base (roll change +-3 deg)
+                        THEN stays on pole base after stopping for 250ms
+                    */
+                    let stop_condition = (found_pole, on_pole_base.0, on_pole_base.1);
+
+                    // Debounce pitch stop condition
                     #[allow(clippy::collapsible_if)]
-                    if on_pole_base.0 || on_pole_base.1 {
-                        if on_pole_base.1 || wait_until(counter, &mut c_started, 250_000) {
+                    if stop_condition.1 {
+                        if wait_until(counter, &mut c_started, 250_000) {
                             stop_pole_base = true;
                         }
-                    } else if !on_pole_base.0 && c_started {
+                    } else if !stop_condition.1 && c_started {
+                        // False positive pitch condition: reset timer and do not stop
                         counter.cancel().unwrap();
                         c_started = false;
                     }
 
-                    if found_pole || stop_pole_base {
+                    // Do not debounce roll stop condition
+                    if stop_condition.2 {
+                        stop_pole_base = true;
+                    }
+
+                    if stop_condition.0 || stop_pole_base {
                         mikoto.stop().unwrap();
-                        if found_pole || wait_until(counter, &mut c_started, 250_000) {
-                            if found_pole || on_pole_base.0 || on_pole_base.1 {
+                        if stop_condition.0 || wait_until(counter, &mut c_started, 250_000) {
+                            if stop_condition.0 || stop_condition.1 || stop_condition.2 {
                                 offset_angle = Angle::new(0.0);
                                 defmt::info!("Pole found! Mission complete.");
                                 *t = Task::WaitForButton;
                             }
-                            stop_pole_base = false
+                            stop_pole_base = false;
                         }
                     } else {
+                        // False positive roll or pitch condition: resume driving
                         mikoto
                             .drive_straight(
                                 gyro_reading.yaw,
