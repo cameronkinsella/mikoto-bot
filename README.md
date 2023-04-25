@@ -2,6 +2,8 @@
 
 MTE 380 Wall Robot Embedded Software
 
+https://user-images.githubusercontent.com/53635597/234186355-44a68633-4a22-4540-85d7-e33a95fca219.mp4
+
 ## Hardware
 
 Board: [Nucleo-F401RE](https://www.st.com/en/evaluation-tools/nucleo-f401re.html)
