@@ -14,7 +14,9 @@ Board: [Nucleo-F401RE](https://www.st.com/en/evaluation-tools/nucleo-f401re.html
 
 ### External Sensors and Actuators
 
-* TODO
+* MPU-6050 3-axis gyroscope and a 3-axis accelerometer
+* VL53L1X time-of-flight sensor
+* FS5103R Continuous Rotation Servos (x3)
 
 ## Usage: Local Environment
 
@@ -64,9 +66,9 @@ DEFMT_LOG=debug cargo run --example button-interrupt
 If probe fails to flash your board you probably need to update the firmware on the onboard programmer.
 The updater can be found at: https://www.st.com/en/development-tools/stsw-link007.html
 
-## Usage: Docker (Linux only)
+## Usage: Docker (Linux/WSL)
 
-This method also works in WSL if you have done the [additional setup](./WSL_README.md) for it.
+This method only works in WSL if you have done the [additional setup](./WSL_README.md) for it.
 
 ### Find the path to your board's USB device
 
